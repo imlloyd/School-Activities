@@ -1,0 +1,472 @@
+---
+title: "Preprocessing"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(recipes)
+library(ggExtra)
+```
+
+
+```{r}
+# load data
+house_price = read_csv('C:\\Users\\user1\\Desktop\\R Data Science\\Machine Learning\\dataset\\House_Price.csv')
+
+head(house_price)
+```
+
+```{r}
+# library for creating dummy variable
+library(dummies)
+```
+
+
+```{r}
+# creating a dummy variable
+house_price <- dummy.data.frame(house_price)
+house_price
+```
+```{r}
+# variables in data set
+names(house_price)
+```
+
+
+```{r}
+# drop non useful columns
+house_price <- house_price %>% 
+  select(-c(dist1, dist2, dist3, dist4, airportNO, waterbodyNone))
+house_price
+```
+
+## data visualization
+```{r}
+house_price %>% 
+  ggplot(aes(n_hot_rooms, price))+
+  geom_point(color = "blue", alpha = .5)+
+  theme_bw()
+```
+
+```{r}
+house_price %>% 
+  ggplot(aes(crime_rate, price))+
+  geom_point(color = "blue", alpha = .5)+
+  theme_bw()
+```
+
+```{r}
+cor(house_price$price, house_price$crime_rate)
+```
+
+
+
+```{r}
+# make some variables transformation
+house_price %>% 
+  mutate(crime_rate = log(1 + crime_rate)) %>% 
+  ggplot(aes(crime_rate, price))+
+  geom_point(color = "orange", alpha = .5)+
+  geom_smooth(method = lm, se = T)+
+  theme_bw()
+```
+
+```{r}
+crimeRate_trans <- house_price %>% 
+  mutate(crime_rate = log(1 + crime_rate)) %>%
+  select(price, crime_rate)
+cor(crimeRate_trans$price, crimeRate_trans$crime_rate)
+```
+
+```{r}
+# correlation Analysis
+round(cor(house_price), 2)
+```
+
+```{r}
+# delete variables parks
+house_price <- house_price %>% 
+  select(-parks)
+head(house_price)
+```
+
+```{r}
+# simple linear regression
+# x = room_num
+# y = price
+```
+
+
+```{r}
+library(patchwork)
+# visualise the room_num variable
+crime_num <- house_price %>% 
+  ggplot(aes(room_num))+
+  geom_boxplot( fill= "blue", outlier.color = "red" )+
+  theme_bw()
+
+price <- house_price %>% 
+  ggplot(aes(price))+
+  geom_boxplot( fill= "blue", outlier.color = "red")+
+  theme_bw()
+
+crime_num | price
+```
+
+```{r}
+library(ggExtra)
+```
+
+
+```{r}
+# create a scatterplot with Histogram
+plot <- house_price %>% 
+  ggplot(aes(x = room_num, y = price))+
+  geom_point(color = "blue", alpha = .5)+
+  geom_smooth(method = lm, se = F)+
+  theme_bw()
+
+ggMarginal(plot,type = "histogram", fill = "blue")
+ggMarginal(plot,type = "density", fill = "darkblue")
+  
+```
+
+
+```{r}
+# create a model
+model <- lm(price ~ room_num, data = house_price) 
+model
+
+```
+
+```{r}
+summary(model)
+```
+
+
+```{r}
+# predicted values
+predicted.values <- -34.6592 + (9.0997 * house_price$room_num)
+predicted.values
+```
+
+
+```{r}
+# visualize the predicted value and the actual value of dependent variable
+
+x <- as.integer(rownames(house_price))
+
+house_price %>% 
+  ggplot(aes(x = x))+
+  geom_line(aes(y = price, color = "price"), lty = 1)+
+  geom_line(aes(y = predicted.values, color = "predicted"), lty = 1)+
+  scale_color_manual(values = c("price" = "blue", "predicted" = "green"))+
+  theme_bw()
+
+```
+
+
+```{r}
+# residual assumption
+lm_residual <- house_price$price - predicted.values
+lm_residual
+```
+
+
+```{r}
+psych::describe(lm_residual)
+```
+
+
+
+```{r}
+# normality
+normality <- ggplot(mapping = aes(x = lm_residual))+
+  geom_density(fill = "blue", alpha = .5, color = "blue")+
+  theme_bw()
+
+linearity <- ggplot(mapping =  aes(x = predicted.values, y = lm_residual))+
+  geom_point(color = "blue", alpha = .5)+
+  geom_hline(aes(yintercept = mean(lm_residual)))+
+  geom_smooth(method = lm , se = T, color = "green")+
+  theme_bw()
+
+homogeniety_variance <- ggplot(mapping =  aes(x = predicted.values, y = sd(lm_residual)))+
+  geom_point(color = "blue")+
+  geom_smooth(method = lm , se = T, color = "green")+
+  theme_bw()
+
+
+
+
+homogeniety_variance | (normality / linearity )
+```
+
+
+
+```{r}
+# removing outliers
+library(Routliers)
+
+res <- outliers_mad(x= house_price$price)
+res
+plot_outliers_mad(res, x = house_price$price)
+```
+
+
+```{r}
+# 
+res1 <- outliers_mad(x= house_price$room_num)
+res1
+plot_outliers_mad(res, x = house_price$room_num)
+```
+
+
+```{r}
+class(house_price$room_num)
+```
+
+
+```{r}
+clean_data <- house_price %>% 
+  mutate(room_num = case_when(room_num < 4.671785 & room_num > 7.745215 ~ mean(room_num, na.rm = T), TRUE ~ room_num)) %>% 
+  select(price, room_num)
+
+head(clean_data)
+```
+
+
+```{r}
+# plot the clean data
+plot2 <- clean_data %>% 
+  ggplot(aes(x = room_num, y = price))+
+  geom_point(color = "blue", alpha = .5)+
+  geom_smooth(method = lm, se = F)+
+  theme_bw()
+
+ggMarginal(plot2,type = "histogram", fill = "blue")
+ggMarginal(plot2,type = "density", fill = "darkblue")
+```
+
+
+```{r}
+# correlation value
+cor(clean_data$price, clean_data$room_num)
+```
+
+```{r}
+# create again the model
+model2 <- lm(price ~ room_num, data = clean_data)
+summary(model2)
+```
+
+
+```{r}
+# predicted value of model2
+predict2 <- -9.2324 + 4.8054 * clean_data$room_num
+```
+
+
+```{r}
+x <- as.integer(rownames(house_price))
+
+clean_data %>% 
+  ggplot(aes(x = x))+
+  geom_line(aes(y = price, color = "price"), lty = 1)+
+  geom_line(aes(y = predict2, color = "predicted"), lty = 1)+
+  scale_color_manual(values = c("price" = "blue", "predicted" = "green"))+
+  theme_bw()
+```
+
+
+```{r}
+names(house_price)
+```
+
+
+## Multiple Linear Regression 
+```{r}
+lm_multi <- lm(price ~., data = house_price)
+```
+
+
+```{r}
+summary(lm_multi)
+```
+
+
+## Train Split
+
+
+```{r}
+# missing value
+sum(is.na(house_price))
+```
+```{r}
+skimr::skim(house_price)
+```
+
+
+```{r}
+# clean the data
+house_price <- house_price %>% 
+  mutate(n_hos_beds = if_else(is.na(n_hos_beds), mean(n_hos_beds, na.rm = T),
+                              n_hos_beds))
+```
+
+
+```{r}
+sum(is.na(house_price))
+```
+
+```{r}
+?ifelse
+```
+
+
+```{r}
+# randomly select in data
+set.seed(0)
+```
+
+
+```{r}
+# creating split of data
+split = sample.split(house_price, SplitRatio = .80)
+```
+
+
+```{r}
+# create a train data
+training_set <- subset(house_price, split == TRUE)
+```
+
+
+```{r}
+# create a test data
+testing_data <- subset(house_price, split == F)
+```
+
+
+```{r}
+# create a model for train and test data
+lm_a <- lm(price ~ ., data = training_set)
+```
+
+```{r}
+summary(lm_a)
+```
+
+
+```{r}
+train_a <- predict(lm_a, training_set)
+train_a
+```
+
+
+```{r}
+test_a <- predict(lm_a, testing_data)
+test_a
+```
+
+```{r}
+# MSE - Mean Squared Error in Train Data
+
+# the model performance of train data is doing well
+
+error <- training_set$price - train_a
+
+mean(error ^ 2)
+
+```
+
+```{r}
+# MSE - Mean Squared Error in Test Data
+
+# the model performance of test data is worst than train data
+
+test_error <- testing_data$price - test_a
+
+mean(test_error ^ 2)
+```
+
+## Subset Selection
+```{r}
+library(leaps)
+```
+
+```{r}
+sum(is.na(house_price))
+```
+
+
+```{r}
+# creating best model
+lm_best = regsubsets(price ~., data = house_price, nvmax = 15)
+summary(lm_best)
+```
+
+
+```{r}
+# Find the adjusted r-squared of all model
+
+summary(lm_best)$adjr2
+```
+
+
+
+```{r}
+# number 9 above have a higher adjusted r-squared
+which.max(summary(lm_best)$adjr2)
+```
+
+
+```{r}
+# get the coefficient of model or called beta sub1 
+coef(lm_best, 15)
+```
+
+
+```{r}
+# creating a traditional model or called forward selection
+lm_forward = regsubsets(price ~., data = house_price, nvmax = 15, method = "forward")
+summary(lm_forward)
+```
+
+```{r}
+# get the adjusted r-squared of forward selection
+
+summary(lm_forward)$adjr2
+
+# find the number of highest r-squared
+which.max(summary(lm_forward)$adjr2)
+```
+
+
+```{r}
+# creating a backward selection
+lm_backward = regsubsets(price ~., data = house_price, nvmax = 15, method = "backward")
+summary(lm_backward)
+```
+
+```{r}
+# get the adjusted r-squared of backward selection
+
+summary(lm_backward)$adjr2
+
+# find the number of highest r-squared
+which.max(summary(lm_backward)$adjr2)
+```
+
+
+
+
+
+
+
+
+
+
+
+

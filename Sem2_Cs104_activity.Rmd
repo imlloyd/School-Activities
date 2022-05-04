@@ -1,0 +1,199 @@
+---
+title: "Quality Control"
+author: "John Lloyd Espada"
+date: "5/2/2022"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+```
+
+
+
+```{r}
+data <- readxl::read_xlsx("C:\\Users\\user1\\Desktop\\Jupyter Project\\dataset\\ControlChartData.xlsx")
+```
+
+```{r}
+head(data)
+```
+
+```{r}
+names(data)
+```
+
+```{r}
+# rename the variables
+
+data <- data %>% 
+  rename("first"= `Weight (g)`, "second" = ...3, "'third" = ...4, "fourth" = ...5, "fifth" = ...6)
+```
+
+
+
+
+```{r}
+data
+```
+
+```{r}
+# create a xbar column 
+x_bar <- data %>% 
+  select(-Day) %>% 
+  rowSums(.)
+
+x_bar <- x_bar / 5
+
+data1 <- cbind(data , x_bar)
+
+data1
+```
+
+
+
+```{r}
+# get the mean of each observation
+EDD <- psych::describe(data, fast = T)
+EDD <- EDD %>% 
+  tail(5)
+EDD
+```
+
+```{r}
+range(data$first)
+```
+
+
+
+
+## Calculate the Control Units
+```{r}
+# central Line
+x_double_bar <- sum(EDD$mean) / 5
+x_double_bar 
+```
+
+```{r}
+whole_observation <- pivot_longer(data, -Day, names_to = "Days", values_to = "observation")
+sd(whole_observation$observation)
+sd_data <- sd(whole_observation$observation) / sqrt(10)
+sd_data
+```
+
+```{r}
+head(whole_observation)
+```
+
+
+
+```{r}
+# control Limits
+
+UCL <- x_double_bar + (3 * sd_data)
+LCL <- x_double_bar - (3 * sd_data)
+UCL
+LCL
+```
+
+## Create the  x_bar Chart
+```{r}
+data %>% 
+  ggplot(aes(x = Day, y = x_bar ))+
+  geom_point(color = "blue", size = 2.5)+
+  geom_line(aes(color = "Sample Mean"), size = 1)+
+  geom_hline(aes(yintercept = UCL, color = "UCL"), lty = 5, size = 1.5, lwd = 1)+
+  geom_hline(aes(yintercept = LCL,  color = "LCL"), lty = 5, size = 1.5, lwd = 1)+
+  geom_hline(aes(yintercept = x_double_bar, color = "CL"), size = 1.5)+
+  scale_color_manual(name = "LINE TYPE - ",
+                     breaks = c("UCL", "LCL", "CL", "Sample Mean"), 
+                     values = c("UCL" = "red", "LCL" = "red", "CL" = "black", "Sample Mean" = "blue" ))+
+  labs(title = "X-BAR CHART",
+       y = "Grams",
+       x = "Days")+
+  theme_bw()+
+  theme(legend.position = "bottom")
+  
+```
+
+
+## Calculate the Range Using R-Bar
+```{r}
+# r bar
+r_bar_cl <- sum(EDD$range) / 10
+r_bar_cl
+```
+
+```{r}
+# calculate the control limits of +-3sd limits
+UCL_xbar <- 497.8 + (0.31 * r_bar_cl)
+LCL_xbar <- 497.8 - (0.31 * r_bar_cl)
+UCL_xbar
+LCL_xbar
+```
+
+
+```{r}
+# center Line and Control Limits Calculations
+LCL_rbar <- 1.78 * r_bar_cl
+UCL_rbar <- 0.22 * r_bar_cl
+LCL_rbar
+UCL_rbar
+```
+
+```{r}
+names(data)
+```
+
+
+## Create the R Bar chart
+```{r}
+r_bar <- vector()
+for( i in 1:10){
+  Range = max(data[i,2:6]) - min(data[i,2:6])
+  r_bar[i] = Range
+}
+r_bar
+```
+
+```{r}
+sample <- cbind(data, r_bar)
+sample
+```
+
+
+```{r}
+# create a bar graph
+sample %>%  
+  ggplot(aes(x = Day, y = r_bar ))+
+  geom_point(color = "blue", size = 2.5)+
+  geom_line( color = "blue", size = 1)+
+  geom_hline(aes(yintercept = UCL_rbar), color = "red", lty = 5, size = 1.5, lwd = 1)+
+  geom_hline(aes(yintercept = LCL_rbar), color = "red", lty = 5, size = 1.5, lwd = 1)+
+  geom_hline(aes(yintercept = r_bar_cl), size = 1.5)+
+  labs(title = "R-Bar Chart",
+       y = "Weight(g)")
+```
+
+
+```{r}
+# final data
+finaldata <- cbind(data1, r_bar)
+```
+
+```{r}
+finaldata
+```
+
+```{r}
+# saving the file
+write.csv(finaldata, "finaldata.csv", row.names = F)
+```
+
+
+
+
+
+
+
+
